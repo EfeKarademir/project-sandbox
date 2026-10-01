@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "TabNest",
+  "version": "0.1.0",
+  "description": "Save tabs into collections on a visual new tab dashboard. Local-first, no account.",
+  "permissions": ["tabs", "storage", "contextMenus", "favicon", "unlimitedStorage"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Save to TabNest" },
+  "chrome_url_overrides": { "newtab": "newtab.html" },
+  "commands": {
+    "open-dashboard": {
+      "suggested_key": { "default": "Alt+Shift+T" },
+      "description": "Open the TabNest dashboard"
+    },
+    "save-all-tabs": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Save all tabs in this window to a new session collection"
+    }
+  }
+}
