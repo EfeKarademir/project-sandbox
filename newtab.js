@@ -1,0 +1,404 @@
+// TabNest dashboard: collections grid, drag & drop, search, import/export.
+const $ = (sel) => document.querySelector(sel);
+const grid = $('#grid');
+
+const state = { collections: [], items: [], showArchived: false };
+
+function el(tag, cls) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  return n;
+}
+
+const hostOf = (url) => { try { return new URL(url).hostname; } catch (_) { return ''; } };
+const faviconUrl = (url) => 'chrome://favicon2/?size=32&scale_factor=1x&page_url=' + encodeURIComponent(url);
+
+// --- Data access ---
+
+function itemsOf(id) {
+  return state.items.filter((i) => i.collectionId === id).sort((a, b) => a.position - b.position);
+}
+
+async function refresh() {
+  state.collections = await listCollections(true);
+  state.items = await listItems();
+  render();
+}
+
+// --- Rendering ---
+
+function render() {
+  grid.textContent = '';
+  const cols = state.collections
+    .filter((c) => (state.showArchived ? true : !c.archivedAt))
+    .sort((a, b) => a.position - b.position);
+  $('#empty').hidden = cols.length > 0;
+  for (const c of cols) grid.append(collectionCard(c));
+  renderResults($('#search').value.trim());
+}
+
+function collectionCard(c) {
+  const card = el('section', 'card');
+  card.draggable = true;
+  card.dataset.id = c.id;
+  if (c.archivedAt) card.classList.add('archived');
+
+  const head = el('div', 'card-head');
+  const name = el('h2');
+  name.textContent = c.name;
+  name.title = 'Double-click to rename';
+  name.ondblclick = () => renameCollection(c);
+
+  const count = el('span', 'count');
+  count.textContent = itemsOf(c.id).length;
+
+  const actions = el('div', 'actions');
+  const openAll = el('button');
+  openAll.textContent = 'Open all';
+  openAll.title = 'Open every tab in a new window';
+  openAll.onclick = () => openCollection(c);
+
+  const archive = el('button');
+  archive.textContent = c.archivedAt ? 'Unarchive' : 'Archive';
+  archive.onclick = async () => {
+    c.archivedAt = c.archivedAt ? undefined : Date.now();
+    await putCollection(c);
+    refresh();
+  };
+
+  const del = el('button');
+  del.textContent = 'Delete';
+  del.onclick = async () => {
+    const n = itemsOf(c.id).length;
+    if (confirm(`Delete collection "${c.name}" and its ${n} tab${n === 1 ? '' : 's'}?`)) {
+      await deleteCollectionDeep(c.id);
+      refresh();
+    }
+  };
+
+  actions.append(openAll, archive, del);
+  head.append(name, count, actions);
+  card.append(head);
+
+  const chips = el('div', 'chips');
+  for (const item of itemsOf(c.id)) chips.append(chipEl(item));
+  card.append(chips);
+
+  // Drag: reorder collections; drop: external URL saves into this collection.
+  card.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('application/x-tabnest-col', c.id);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  card.addEventListener('dragover', (e) => {
+    if (e.dataTransfer.types.includes('application/x-tabnest-col') || externalUrlTypes(e)) {
+      e.preventDefault();
+      card.classList.add('drop-into');
+    }
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('drop-into'));
+  card.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    card.classList.remove('drop-into');
+    const draggedCol = e.dataTransfer.getData('application/x-tabnest-col');
+    if (draggedCol && draggedCol !== c.id) {
+      await reorderCollections(draggedCol, c.id);
+      return;
+    }
+    const url = externalUrl(e);
+    if (url) {
+      await makeItem(c.id, { title: hostOf(url), url });
+      refresh();
+    }
+  });
+
+  return card;
+}
+
+function chipEl(item) {
+  const wrap = el('span', 'chip-wrap');
+  wrap.draggable = true;
+  wrap.dataset.id = item.id;
+
+  const a = el('a', 'chip');
+  a.href = item.url;
+  a.title = `${item.url}\nClick: open \u00b7 Shift+click: open & remove \u00b7 Middle-click: background`;
+
+  const img = document.createElement('img');
+  img.alt = '';
+  img.src = item.favIconUrl || faviconUrl(item.url);
+  img.onerror = () => {
+    const t = el('span', 'tile');
+    t.textContent = (item.title || hostOf(item.url) || '?').trim().charAt(0).toUpperCase() || '?';
+    img.replaceWith(t);
+  };
+
+  const label = el('span', 'chip-title');
+  label.textContent = item.title || hostOf(item.url) || item.url;
+
+  a.append(img, label);
+  a.addEventListener('click', () => putItem({ ...item, lastOpenedAt: Date.now() }));
+  a.addEventListener('click', (e) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      openItem(item);
+      deleteItem(item.id).then(refresh);
+    }
+  });
+
+  const x = el('button', 'chip-x');
+  x.textContent = '\u00d7';
+  x.title = 'Remove from collection';
+  x.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await deleteItem(item.id);
+    refresh();
+  };
+
+  wrap.append(a, x);
+
+  // Drag: reorder within the collection.
+  wrap.addEventListener('dragstart', (e) => {
+    e.stopPropagation();
+    e.dataTransfer.setData('application/x-tabnest-item', item.id);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  wrap.addEventListener('dragover', (e) => {
+    if (e.dataTransfer.types.includes('application/x-tabnest-item')) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  });
+  wrap.addEventListener('drop', (e) => {
+    if (!e.dataTransfer.types.includes('application/x-tabnest-item')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    reorderItems(e.dataTransfer.getData('application/x-tabnest-item'), item.id);
+  });
+
+  return wrap;
+}
+
+// --- Actions ---
+
+async function renameCollection(c) {
+  const name = prompt('Collection name', c.name);
+  if (!name || name === c.name) return;
+  c.name = name;
+  await putCollection(c);
+  refresh();
+}
+
+async function openCollection(c) {
+  const items = itemsOf(c.id);
+  if (!items.length) return;
+  await chrome.windows.create({ url: items.map((i) => i.url) });
+  const now = Date.now();
+  for (const i of items) await putItem({ ...i, lastOpenedAt: now });
+}
+
+function openItem(item) {
+  chrome.tabs.create({ url: item.url });
+  putItem({ ...item, lastOpenedAt: Date.now() });
+}
+
+async function reorderCollections(draggedId, targetId) {
+  const cols = state.collections.filter((c) => !c.archivedAt).sort((a, b) => a.position - b.position);
+  const from = cols.findIndex((c) => c.id === draggedId);
+  const to = cols.findIndex((c) => c.id === targetId);
+  if (from < 0 || to < 0) return;
+  cols.splice(to, 0, cols.splice(from, 1)[0]);
+  for (let i = 0; i < cols.length; i++) {
+    cols[i].position = i;
+    await putCollection(cols[i]);
+  }
+  refresh();
+}
+
+async function reorderItems(draggedId, targetId) {
+  const dragged = state.items.find((i) => i.id === draggedId);
+  const target = state.items.find((i) => i.id === targetId);
+  if (!dragged || !target || dragged.collectionId !== target.collectionId || draggedId === targetId) return;
+  const list = itemsOf(dragged.collectionId);
+  const from = list.findIndex((i) => i.id === draggedId);
+  const to = list.findIndex((i) => i.id === targetId);
+  list.splice(to, 0, list.splice(from, 1)[0]);
+  for (let i = 0; i < list.length; i++) {
+    list[i].position = i;
+    await putItem(list[i]);
+  }
+  refresh();
+}
+
+// --- Drag helpers ---
+
+function externalUrlTypes(e) {
+  return e.dataTransfer.types.includes('text/uri-list') || e.dataTransfer.types.includes('text/plain');
+}
+
+function externalUrl(e) {
+  const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+  return /^https?:\/\//.test(url || '') ? url : null;
+}
+
+// --- Search ---
+
+function fuzzy(needle, hay) {
+  needle = needle.toLowerCase();
+  hay = (hay || '').toLowerCase();
+  let i = 0;
+  let score = 0;
+  let last = -2;
+  for (const ch of needle) {
+    const idx = hay.indexOf(ch, i);
+    if (idx < 0) return -1;
+    score += idx === last + 1 ? 3 : 1;
+    last = idx;
+    i = idx + 1;
+  }
+  return score;
+}
+
+function scoredItems(query) {
+  return state.items
+    .map((item) => ({
+      item,
+      s: Math.max(
+        fuzzy(query, item.title),
+        fuzzy(query, item.url),
+        fuzzy(query, (item.tags || []).join(' '))
+      ),
+    }))
+    .filter((r) => r.s >= 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 10);
+}
+
+function renderResults(query) {
+  const box = $('#results');
+  box.textContent = '';
+  if (!query) {
+    box.hidden = true;
+    return;
+  }
+  const hits = scoredItems(query);
+  if (!hits.length) {
+    const none = el('div', 'no-hits');
+    none.textContent = 'No matches.';
+    box.append(none);
+    box.hidden = false;
+    return;
+  }
+  for (const { item } of hits) {
+    const col = state.collections.find((c) => c.id === item.collectionId);
+    const row = el('div', 'result');
+
+    const img = document.createElement('img');
+    img.alt = '';
+    img.src = item.favIconUrl || faviconUrl(item.url);
+    img.onerror = () => img.remove();
+
+    const title = el('span');
+    title.textContent = item.title || item.url;
+
+    const sub = el('small');
+    sub.textContent = (col ? col.name + ' \u00b7 ' : '') + hostOf(item.url);
+
+    row.append(img, title, sub);
+    row.onclick = () => {
+      openItem(item);
+      $('#search').value = '';
+      renderResults('');
+    };
+    box.append(row);
+  }
+  box.hidden = false;
+}
+
+$('#search').addEventListener('input', (e) => renderResults(e.target.value.trim()));
+$('#search').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const hits = scoredItems($('#search').value.trim());
+    if (hits.length) {
+      openItem(hits[0].item);
+      $('#search').value = '';
+      renderResults('');
+    }
+  } else if (e.key === 'Escape') {
+    $('#search').value = '';
+    renderResults('');
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    $('#search').focus();
+    $('#search').select();
+  }
+});
+
+// --- Header buttons ---
+
+$('#btn-new').onclick = async () => {
+  const name = prompt('Collection name');
+  if (!name) return;
+  await makeCollection(name);
+  refresh();
+};
+
+$('#btn-export').onclick = async () => {
+  const data = await exportAll();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tabnest-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+$('#btn-import').onclick = () => $('#file-import').click();
+
+$('#file-import').onchange = async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    if (file.name.toLowerCase().endsWith('.json')) {
+      if (!confirm('Import replaces ALL saved data with the file contents. Continue?')) return;
+      await importAll(JSON.parse(await file.text()));
+    } else {
+      // Bookmarks HTML (Netscape/Chrome export). Links only, flattened.
+      const doc = new DOMParser().parseFromString(await file.text(), 'text/html');
+      const links = [...doc.querySelectorAll('a')].filter((a) => /^https?:/.test(a.href));
+      if (!links.length) {
+        alert('No bookmarks found in this file.');
+        return;
+      }
+      const c = await makeCollection('Imported bookmarks ' + new Date().toLocaleDateString());
+      for (const a of links) {
+        await makeItem(c.id, { title: a.textContent.trim() || a.href, url: a.href });
+      }
+    }
+    refresh();
+  } catch (err) {
+    alert('Import failed: ' + err.message);
+  }
+};
+
+$('#show-archived').onchange = async (e) => {
+  state.showArchived = e.target.checked;
+  await chrome.storage.local.set({ showArchived: state.showArchived });
+  render();
+};
+
+// --- Init ---
+
+window.addEventListener('focus', refresh);
+
+(async function init() {
+  const { showArchived } = await chrome.storage.local.get('showArchived');
+  state.showArchived = !!showArchived;
+  $('#show-archived').checked = state.showArchived;
+  await refresh();
+})();
