@@ -1,4 +1,4 @@
-// TabNest dashboard: collections grid, drag & drop, search, import/export.
+// TabNest dashboard: sidebar nav, collection sections, card rows, search, import/export.
 const $ = (sel) => document.querySelector(sel);
 const grid = $('#grid');
 
@@ -33,25 +33,26 @@ function render() {
     .filter((c) => (state.showArchived ? true : !c.archivedAt))
     .sort((a, b) => a.position - b.position);
   $('#empty').hidden = cols.length > 0;
-  for (const c of cols) grid.append(collectionCard(c));
+  for (const c of cols) grid.append(sectionEl(c));
   renderResults($('#search').value.trim());
 }
 
-function collectionCard(c) {
-  const card = el('section', 'card');
-  card.draggable = true;
-  card.dataset.id = c.id;
-  if (c.archivedAt) card.classList.add('archived');
+function sectionEl(c) {
+  const section = el('section', 'section');
+  section.draggable = true;
+  section.dataset.id = c.id;
+  if (c.archivedAt) section.classList.add('archived');
 
-  const head = el('div', 'card-head');
-  const name = el('h2');
-  name.textContent = c.name;
-  name.title = 'Double-click to rename';
-  name.ondblclick = () => renameCollection(c);
+  const head = el('div', 'section-head');
+
+  const badge = el('span', 'badge');
+  badge.textContent = c.name;
+  badge.title = 'Double-click to rename';
+  badge.ondblclick = () => renameCollection(c);
 
   const n = itemsOf(c.id).length;
-  const count = el('span', 'count');
-  count.textContent = n === 1 ? '1 tab' : `${n} tabs`;
+  const meta = el('span', 'meta');
+  meta.textContent = n === 1 ? '1 tab' : `${n} tabs`;
 
   const actions = el('div', 'actions');
   const openAll = el('button');
@@ -70,36 +71,36 @@ function collectionCard(c) {
   const del = el('button');
   del.textContent = 'Delete';
   del.onclick = async () => {
-    const n = itemsOf(c.id).length;
-    if (confirm(`Delete collection "${c.name}" and its ${n} tab${n === 1 ? '' : 's'}?`)) {
+    const cnt = itemsOf(c.id).length;
+    if (confirm(`Delete collection "${c.name}" and its ${cnt} tab${cnt === 1 ? '' : 's'}?`)) {
       await deleteCollectionDeep(c.id);
       refresh();
     }
   };
 
   actions.append(openAll, archive, del);
-  head.append(name, count, actions);
-  card.append(head);
+  head.append(badge, meta, actions);
+  section.append(head);
 
-  const tiles = el('div', 'tiles');
-  for (const item of itemsOf(c.id)) tiles.append(tileEl(item));
-  card.append(tiles);
+  const row = el('div', 'row');
+  for (const item of itemsOf(c.id)) row.append(tabCardEl(item));
+  section.append(row);
 
   // Drag: reorder collections; drop: external URL saves into this collection.
-  card.addEventListener('dragstart', (e) => {
+  section.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('application/x-tabnest-col', c.id);
     e.dataTransfer.effectAllowed = 'move';
   });
-  card.addEventListener('dragover', (e) => {
+  section.addEventListener('dragover', (e) => {
     if (e.dataTransfer.types.includes('application/x-tabnest-col') || externalUrlTypes(e)) {
       e.preventDefault();
-      card.classList.add('drop-into');
+      section.classList.add('drop-into');
     }
   });
-  card.addEventListener('dragleave', () => card.classList.remove('drop-into'));
-  card.addEventListener('drop', async (e) => {
+  section.addEventListener('dragleave', () => section.classList.remove('drop-into'));
+  section.addEventListener('drop', async (e) => {
     e.preventDefault();
-    card.classList.remove('drop-into');
+    section.classList.remove('drop-into');
     const draggedCol = e.dataTransfer.getData('application/x-tabnest-col');
     if (draggedCol && draggedCol !== c.id) {
       await reorderCollections(draggedCol, c.id);
@@ -112,33 +113,41 @@ function collectionCard(c) {
     }
   });
 
-  return card;
+  return section;
 }
 
-function tileEl(item) {
-  const wrap = el('span', 'tile-wrap');
+function tabCardEl(item) {
+  const wrap = el('span', 'tab-wrap');
   wrap.draggable = true;
   wrap.dataset.id = item.id;
   wrap.title = `${item.title || item.url}\n${item.url}\nShift+click: open & remove \u00b7 Middle-click: background`;
 
-  const a = el('a', 'tile-link');
-  a.href = item.url;
+  const card = el('a', 'tab-card');
+  card.href = item.url;
 
+  const ico = el('span', 'tab-ico');
   const img = document.createElement('img');
   img.alt = '';
   img.src = item.favIconUrl || faviconUrl(item.url);
   img.onerror = () => {
-    const t = el('span', 'tile-letter');
+    const t = el('span', 'tab-letter');
     t.textContent = (item.title || hostOf(item.url) || '?').trim().charAt(0).toUpperCase() || '?';
     img.replaceWith(t);
   };
+  ico.append(img);
 
-  const title = el('span', 'tile-title');
+  const title = el('span', 'tab-title');
   title.textContent = item.title || hostOf(item.url) || item.url;
 
-  a.append(img, title);
-  a.addEventListener('click', () => putItem({ ...item, lastOpenedAt: Date.now() }));
-  a.addEventListener('click', (e) => {
+  const desc = el('span', 'tab-desc');
+  desc.textContent = hostOf(item.url);
+
+  const meta = el('span', 'tab-meta');
+  meta.textContent = new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+
+  card.append(ico, title, desc, meta);
+  card.addEventListener('click', () => putItem({ ...item, lastOpenedAt: Date.now() }));
+  card.addEventListener('click', (e) => {
     if (e.shiftKey) {
       e.preventDefault();
       openItem(item);
@@ -146,7 +155,7 @@ function tileEl(item) {
     }
   });
 
-  const x = el('button', 'tile-x');
+  const x = el('button', 'tab-x');
   x.textContent = '\u00d7';
   x.title = 'Remove from collection';
   x.onclick = async (e) => {
@@ -156,7 +165,7 @@ function tileEl(item) {
     refresh();
   };
 
-  wrap.append(a, x);
+  wrap.append(card, x);
 
   // Drag: reorder within the collection.
   wrap.addEventListener('dragstart', (e) => {
@@ -339,7 +348,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// --- Header buttons ---
+// --- Topbar buttons ---
 
 $('#btn-new').onclick = async () => {
   const name = prompt('Collection name');
@@ -387,32 +396,30 @@ $('#file-import').onchange = async (e) => {
   }
 };
 
-$('#show-archived').onchange = async (e) => {
-  state.showArchived = e.target.checked;
-  await chrome.storage.local.set({ showArchived: state.showArchived });
-  render();
-};
+// --- Sidebar nav ---
 
-// --- Theme ---
-
-function applyTheme(stored) {
-  const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+function updateNav() {
+  $('#nav-all').classList.toggle('active', !state.showArchived);
+  $('#nav-archived').classList.toggle('active', state.showArchived);
 }
 
-// The popup's Dark mode switch writes `theme`; apply it live to any open dashboard.
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.theme) applyTheme(changes.theme.newValue);
-});
+async function setArchivedView(on) {
+  state.showArchived = on;
+  await chrome.storage.local.set({ showArchived: on });
+  updateNav();
+  render();
+}
+
+$('#nav-all').onclick = () => setArchivedView(false);
+$('#nav-archived').onclick = () => setArchivedView(true);
 
 // --- Init ---
 
 window.addEventListener('focus', refresh);
 
 (async function init() {
-  const { showArchived, theme } = await chrome.storage.local.get(['showArchived', 'theme']);
+  const { showArchived } = await chrome.storage.local.get('showArchived');
   state.showArchived = !!showArchived;
-  $('#show-archived').checked = state.showArchived;
-  applyTheme(theme);
+  updateNav();
   await refresh();
 })();
