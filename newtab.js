@@ -413,13 +413,26 @@ async function setArchivedView(on) {
 $('#nav-all').onclick = () => setArchivedView(false);
 $('#nav-archived').onclick = () => setArchivedView(true);
 
+// --- Theme ---
+
+function applyTheme(stored) {
+  const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+}
+
+// The popup's Dark mode switch writes `theme`; apply it live to any open dashboard.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.theme) applyTheme(changes.theme.newValue);
+});
+
 // --- Init ---
 
 window.addEventListener('focus', refresh);
 
 (async function init() {
-  const { showArchived } = await chrome.storage.local.get('showArchived');
+  const { showArchived, theme } = await chrome.storage.local.get(['showArchived', 'theme']);
   state.showArchived = !!showArchived;
+  applyTheme(theme);
   updateNav();
   await refresh();
 })();
