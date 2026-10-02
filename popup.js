@@ -4,6 +4,10 @@ const $ = (sel) => document.querySelector(sel);
 let currentTab = null;
 
 async function init() {
+  const { theme } = await chrome.storage.local.get('theme');
+  const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+
   [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const cols = (await listCollections()).sort((a, b) => b.createdAt - a.createdAt); // recent first
   const sel = $('#collection');

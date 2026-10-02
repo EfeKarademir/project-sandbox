@@ -393,13 +393,28 @@ $('#show-archived').onchange = async (e) => {
   render();
 };
 
+// --- Theme ---
+
+function applyTheme(stored) {
+  const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('#dark-mode').checked = dark;
+}
+
+$('#dark-mode').onchange = async (e) => {
+  const theme = e.target.checked ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  await chrome.storage.local.set({ theme });
+};
+
 // --- Init ---
 
 window.addEventListener('focus', refresh);
 
 (async function init() {
-  const { showArchived } = await chrome.storage.local.get('showArchived');
+  const { showArchived, theme } = await chrome.storage.local.get(['showArchived', 'theme']);
   state.showArchived = !!showArchived;
   $('#show-archived').checked = state.showArchived;
+  applyTheme(theme);
   await refresh();
 })();
