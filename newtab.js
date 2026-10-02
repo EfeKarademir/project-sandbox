@@ -81,9 +81,9 @@ function collectionCard(c) {
   head.append(name, count, actions);
   card.append(head);
 
-  const chips = el('div', 'chips');
-  for (const item of itemsOf(c.id)) chips.append(chipEl(item));
-  card.append(chips);
+  const tiles = el('div', 'tiles');
+  for (const item of itemsOf(c.id)) tiles.append(tileEl(item));
+  card.append(tiles);
 
   // Drag: reorder collections; drop: external URL saves into this collection.
   card.addEventListener('dragstart', (e) => {
@@ -115,28 +115,28 @@ function collectionCard(c) {
   return card;
 }
 
-function chipEl(item) {
-  const wrap = el('span', 'chip-wrap');
+function tileEl(item) {
+  const wrap = el('span', 'tile-wrap');
   wrap.draggable = true;
   wrap.dataset.id = item.id;
+  wrap.title = `${item.title || item.url}\n${item.url}\nShift+click: open & remove \u00b7 Middle-click: background`;
 
-  const a = el('a', 'chip');
+  const a = el('a', 'tile-link');
   a.href = item.url;
-  a.title = `${item.url}\nClick: open \u00b7 Shift+click: open & remove \u00b7 Middle-click: background`;
 
   const img = document.createElement('img');
   img.alt = '';
   img.src = item.favIconUrl || faviconUrl(item.url);
   img.onerror = () => {
-    const t = el('span', 'tile');
+    const t = el('span', 'tile-letter');
     t.textContent = (item.title || hostOf(item.url) || '?').trim().charAt(0).toUpperCase() || '?';
     img.replaceWith(t);
   };
 
-  const label = el('span', 'chip-title');
-  label.textContent = item.title || hostOf(item.url) || item.url;
+  const title = el('span', 'tile-title');
+  title.textContent = item.title || hostOf(item.url) || item.url;
 
-  a.append(img, label);
+  a.append(img, title);
   a.addEventListener('click', () => putItem({ ...item, lastOpenedAt: Date.now() }));
   a.addEventListener('click', (e) => {
     if (e.shiftKey) {
@@ -146,7 +146,7 @@ function chipEl(item) {
     }
   });
 
-  const x = el('button', 'chip-x');
+  const x = el('button', 'tile-x');
   x.textContent = '\u00d7';
   x.title = 'Remove from collection';
   x.onclick = async (e) => {
@@ -398,14 +398,12 @@ $('#show-archived').onchange = async (e) => {
 function applyTheme(stored) {
   const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  $('#dark-mode').checked = dark;
 }
 
-$('#dark-mode').onchange = async (e) => {
-  const theme = e.target.checked ? 'dark' : 'light';
-  document.documentElement.dataset.theme = theme;
-  await chrome.storage.local.set({ theme });
-};
+// The popup's Dark mode switch writes `theme`; apply it live to any open dashboard.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.theme) applyTheme(changes.theme.newValue);
+});
 
 // --- Init ---
 

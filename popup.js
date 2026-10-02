@@ -7,6 +7,7 @@ async function init() {
   const { theme } = await chrome.storage.local.get('theme');
   const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('#dark-mode').checked = dark;
 
   [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const cols = (await listCollections()).sort((a, b) => b.createdAt - a.createdAt); // recent first
@@ -27,6 +28,13 @@ async function init() {
 
 $('#open-dashboard').onclick = () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
+};
+
+// Theme switch here drives both the popup and every open dashboard tab.
+$('#dark-mode').onchange = async (e) => {
+  const theme = e.target.checked ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  await chrome.storage.local.set({ theme });
 };
 
 async function chosenCollection() {
