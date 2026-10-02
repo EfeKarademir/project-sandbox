@@ -143,6 +143,8 @@ label.switch { display: flex; align-items: center; gap: 6px; color: var(--muted)
 body.popup { width: 300px; }
 .popup-wrap { padding: 12px; display: grid; gap: 10px; }
 .popup-wrap h2 { font-size: 15px; margin: 0; }
+.popup-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.popup-head button { padding: 4px 8px; font-size: 12px; }
 .popup-wrap select {
   padding: 8px;
   border-radius: 8px;

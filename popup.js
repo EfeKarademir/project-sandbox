@@ -21,6 +21,10 @@ async function init() {
   if (!cols.length) sel.value = 'new';
 }
 
+$('#open-dashboard').onclick = () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
+};
+
 async function chosenCollection() {
   const sel = $('#collection');
   if (sel.value !== 'new') {
