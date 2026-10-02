@@ -49,8 +49,9 @@ function collectionCard(c) {
   name.title = 'Double-click to rename';
   name.ondblclick = () => renameCollection(c);
 
+  const n = itemsOf(c.id).length;
   const count = el('span', 'count');
-  count.textContent = itemsOf(c.id).length;
+  count.textContent = n === 1 ? '1 tab' : `${n} tabs`;
 
   const actions = el('div', 'actions');
   const openAll = el('button');
