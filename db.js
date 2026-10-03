@@ -47,7 +47,10 @@ const uid = () => crypto.randomUUID();
 async function listCollections(includeArchived = false) {
   const rows = await dbRun('collections', 'readonly', (tx) => tx.objectStore('collections').getAll());
   rows.sort((a, b) => a.position - b.position);
-  return includeArchived ? rows : rows.filter((c) => !c.archivedAt);
+  // includeArchived === 'only' → archived collections alone (Archived sidebar view).
+  if (includeArchived === 'only') return rows.filter((c) => c.archivedAt);
+  if (includeArchived) return rows;
+  return rows.filter((c) => !c.archivedAt); // default: hide archived everywhere
 }
 
 async function listItems() {
