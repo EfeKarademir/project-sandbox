@@ -11,7 +11,7 @@ function el(tag, cls) {
 }
 
 const hostOf = (url) => { try { return new URL(url).hostname; } catch (_) { return ''; } };
-const faviconUrl = (url) => 'chrome://favicon2/?size=32&scale_factor=1x&page_url=' + encodeURIComponent(url);
+const faviconUrl = (url) => chrome.runtime.getURL('/_favicon/?pageUrl=' + encodeURIComponent(url) + '&size=32');
 
 // --- Data access ---
 
