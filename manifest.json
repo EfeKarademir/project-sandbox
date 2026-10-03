@@ -6,7 +6,6 @@
   "permissions": ["tabs", "storage", "contextMenus", "favicon", "unlimitedStorage"],
   "background": { "service_worker": "background.js" },
   "action": { "default_popup": "popup.html", "default_title": "Save to TabNest" },
-  "chrome_url_overrides": { "newtab": "newtab.html" },
   "commands": {
     "open-dashboard": {
       "suggested_key": { "default": "Alt+Shift+T" },
