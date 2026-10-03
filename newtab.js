@@ -57,8 +57,12 @@ function sectionEl(c) {
   const actions = el('div', 'actions');
   const openAll = el('button');
   openAll.textContent = 'Open all';
-  openAll.title = 'Open every tab in a new window';
-  openAll.onclick = () => openCollection(c);
+  openAll.title = 'Open every tab — pick new window or current window';
+  openAll.onclick = () => {
+    const items = itemsOf(c.id);
+    if (!items.length) return;
+    openTargetBar(c.name, items.length, (choice) => openCollection(c, choice));
+  };
 
   const archive = el('button');
   archive.textContent = c.archivedAt ? 'Unarchive' : 'Archive';
@@ -199,10 +203,43 @@ async function renameCollection(c) {
   refresh();
 }
 
-async function openCollection(c) {
+// Ask where "Open all" should land: current window vs its own window.
+function openTargetBar(name, n, onChoose) {
+  document.querySelector('.open-target')?.remove();
+  const bar = el('div', 'open-target');
+  const msg = el('span', 'open-target-msg');
+  msg.textContent = `Open ${n} tab${n === 1 ? '' : 's'} from "${name}"`;
+  const cancel = el('button');
+  cancel.textContent = 'Cancel';
+  const current = el('button');
+  current.textContent = 'Current window';
+  const fresh = el('button', 'open-target-new');
+  fresh.textContent = 'New window';
+  bar.append(msg, cancel, current, fresh);
+  document.body.append(bar);
+  fresh.focus();
+  const close = () => {
+    bar.remove();
+    document.removeEventListener('click', outsideDismiss);
+    document.removeEventListener('keydown', onEsc);
+  };
+  const outsideDismiss = (e) => { if (!bar.contains(e.target)) close(); };
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('click', outsideDismiss);
+  document.addEventListener('keydown', onEsc);
+  current.onclick = () => { close(); onChoose('current'); };
+  fresh.onclick = () => { close(); onChoose('window'); };
+  cancel.onclick = close;
+}
+
+async function openCollection(c, target) {
   const items = itemsOf(c.id);
   if (!items.length) return;
-  await chrome.windows.create({ url: items.map((i) => i.url) });
+  if (target === 'window') {
+    await chrome.windows.create({ url: items.map((i) => i.url) });
+  } else {
+    for (const i of items) await chrome.tabs.create({ url: i.url });
+  }
   const now = Date.now();
   for (const i of items) await putItem({ ...i, lastOpenedAt: now });
 }
