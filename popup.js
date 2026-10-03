@@ -1,13 +1,24 @@
 // Quick-save popup: current tab or whole window into a picked collection.
+// Appearance: theme = System/Light/Dark; palette = accent/font color choice.
 const $ = (sel) => document.querySelector(sel);
 
 let currentTab = null;
 
-async function init() {
-  const { theme } = await chrome.storage.local.get('theme');
-  const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+const PALETTES = ['classic', 'ocean', 'sepia', 'nocturne'];
+const normalizePalette = (p) => (PALETTES.includes(p) ? p : 'classic');
+const normalizeTheme = (t) => (['system', 'light', 'dark'].includes(t) ? t : 'system');
+
+function applyTheme(theme, palette) {
+  const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  $('#dark-mode').checked = dark;
+  document.documentElement.dataset.palette = normalizePalette(palette);
+}
+
+async function init() {
+  const { theme, palette } = await chrome.storage.local.get(['theme', 'palette']);
+  applyTheme(theme, palette);
+  $('#picker-theme').value = normalizeTheme(theme);
+  $('#picker-palette').value = normalizePalette(palette);
 
   [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const cols = (await listCollections()).sort((a, b) => b.createdAt - a.createdAt); // recent first
@@ -40,11 +51,17 @@ $('#open-dashboard').onclick = () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
 };
 
-// Theme switch here drives both the popup and every open dashboard tab.
-$('#dark-mode').onchange = async (e) => {
-  const theme = e.target.checked ? 'dark' : 'light';
-  document.documentElement.dataset.theme = theme;
+// Theme/palette writes here drive the popup and every open dashboard tab.
+$('#picker-theme').onchange = async (e) => {
+  const theme = e.target.value;
   await chrome.storage.local.set({ theme });
+  applyTheme(theme, $('#picker-palette').value);
+};
+
+$('#picker-palette').onchange = async (e) => {
+  const palette = e.target.value;
+  await chrome.storage.local.set({ palette });
+  document.documentElement.dataset.palette = palette;
 };
 
 $('#save-tab').onclick = async () => {
