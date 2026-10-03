@@ -413,16 +413,27 @@ async function setArchivedView(on) {
 $('#nav-all').onclick = () => setArchivedView(false);
 $('#nav-archived').onclick = () => setArchivedView(true);
 
-// --- Theme ---
+// --- Theme & palette ---
+// Palette pick is independent of theme (dark/light). `nocturne` ignores theme
+// (same look either way); the others re-tint per theme.
+
+const PALETTES = ['classic', 'ocean', 'sepia', 'nocturne'];
+const normalizePalette = (p) => (PALETTES.includes(p) ? p : 'classic');
+
+function systemDark() {
+  return matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
 function applyTheme(stored) {
-  const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = stored === 'dark' || ((stored === undefined || stored === 'system') && systemDark());
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 
-// The popup's Dark mode switch writes `theme`; apply it live to any open dashboard.
+// The popup's Theme/Palette selectors write `theme`/`palette`; apply live.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.theme) applyTheme(changes.theme.newValue);
+  if (area !== 'local') return;
+  if (changes.theme) applyTheme(changes.theme.newValue);
+  if (changes.palette) document.documentElement.dataset.palette = normalizePalette(changes.palette.newValue);
 });
 
 // --- Init ---
@@ -430,9 +441,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 window.addEventListener('focus', refresh);
 
 (async function init() {
-  const { showArchived, theme } = await chrome.storage.local.get(['showArchived', 'theme']);
+  const { showArchived, theme, palette } = await chrome.storage.local.get(['showArchived', 'theme', 'palette']);
   state.showArchived = !!showArchived;
   applyTheme(theme);
+  document.documentElement.dataset.palette = normalizePalette(palette);
   updateNav();
   await refresh();
 })();
