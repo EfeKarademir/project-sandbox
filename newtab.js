@@ -437,3 +437,9 @@ window.addEventListener('focus', refresh);
   updateNav();
   await refresh();
 })();
+
+// Not your new tab page by default (chrome_url_overrides is removed from the
+// manifest; MV3 cannot flip it at runtime). Open this dashboard via the popup's
+// "Open dashboard", the Alt+Shift+T command, or chrome://extensions "Details".
+// ponytail: opt-in via manifest edit; a runtime switch needs the MV3
+// chrome_url_overrides API that does not exist yet.
