@@ -294,6 +294,37 @@ input[type="checkbox"] { accent-color: var(--accent); }
 
 /* Empty state — invitation, not mood */
 #empty { max-width: 420px; margin: 0 auto; padding: 90px 20px 40px; text-align: center; color: var(--muted); }
+
+/* "Open all" target chooser — replaces the old silent new-window behavior */
+.open-target {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-float);
+  z-index: 20;
+}
+.open-target-msg { font-size: 13.5px; }
+.open-target button {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 600 13px var(--sans);
+  cursor: pointer;
+}
+.open-target button:hover { border-color: var(--accent); color: var(--accent); }
+.open-target button.open-target-new { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.open-target button.open-target-new:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+
 #empty > p:first-child { font-size: 18px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
 #empty .sub { margin: 0 0 22px; }
 #empty ol { text-align: left; display: inline-block; margin: 0; padding-left: 18px; line-height: 1.9; }
