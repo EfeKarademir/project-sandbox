@@ -1,6 +1,11 @@
-/* TabNest — light, minimal, friendly. Sidebar nav, pink accent, soft badges. */
-
+/* TabNest — palette choice. Theme (dark/light) stays the popup switch; palette
+   independent of it. Available choices live in js-Themes(). Default = classic pink.
+   Selected id + dark/light render as: <html data-theme data-palette>. */
 :root {
+  --sans: -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root[data-palette='classic'] {
   --bg: #FFFFFF;
   --sidebar: #F8F9FA;
   --ink: #2C3E50;
@@ -15,12 +20,11 @@
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.08);
   --hover-tint: rgba(255, 107, 157, 0.08);
   --on-accent: #FFFFFF;
-  --sans: -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Dark: forest-night green */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root[data-palette='classic'] {
     --bg: #131A16;
     --sidebar: #101613;
     --ink: #E8EFE9;
@@ -37,7 +41,8 @@
     --on-accent: #10241C;
   }
 }
-:root[data-theme="dark"] {
+
+:root[data-theme='dark'][data-palette='classic'] {
   --bg: #131A16;
   --sidebar: #101613;
   --ink: #E8EFE9;
@@ -52,6 +57,132 @@
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
   --hover-tint: rgba(82, 185, 149, 0.12);
   --on-accent: #10241C;
+}
+
+/* Ocean — calm blue */
+:root[data-palette='ocean'] {
+  --bg: #FFFFFF;
+  --sidebar: #F4F7FA;
+  --ink: #23395B;
+  --muted: #6A7F94;
+  --accent: #2E86C1;
+  --accent-hover: #2874A6;
+  --badge: #E8F1F8;
+  --badge-ink: #1B4F72;
+  --danger: #E74C3C;
+  --line: #E1E8ED;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --hover-tint: rgba(46, 134, 193, 0.08);
+  --on-accent: #FFFFFF;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='ocean'] {
+    --bg: #0F1721;
+    --sidebar: #0C1219;
+    --ink: #DFE9F3;
+    --muted: #8FA3B5;
+    --accent: #5DADE2;
+    --accent-hover: #73C1EC;
+    --badge: #16222E;
+    --badge-ink: #85C1E9;
+    --danger: #E07B5D;
+    --line: #263340;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --hover-tint: rgba(93, 173, 226, 0.12);
+    --on-accent: #0B1620;
+  }
+}
+
+:root[data-theme='dark'][data-palette='ocean'] {
+  --bg: #0F1721;
+  --sidebar: #0C1219;
+  --ink: #DFE9F3;
+  --muted: #8FA3B5;
+  --accent: #5DADE2;
+  --accent-hover: #73C1EC;
+  --badge: #16222E;
+  --badge-ink: #85C1E9;
+  --danger: #E07B5D;
+  --line: #263340;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --hover-tint: rgba(93, 173, 226, 0.12);
+  --on-accent: #0B1620;
+}
+
+/* Sepia — warm paper, readable ink */
+:root[data-palette='sepia'] {
+  --bg: #FFF8EF;
+  --sidebar: #F6EEE1;
+  --ink: #4A3B2A;
+  --muted: #8C7A64;
+  --accent: #C4874B;
+  --accent-hover: #B3773F;
+  --badge: #F3E4CE;
+  --badge-ink: #8A5A22;
+  --danger: #C65A3A;
+  --line: #EADBC5;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.10);
+  --hover-tint: rgba(196, 135, 75, 0.10);
+  --on-accent: #FFF8EF;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='sepia'] {
+    --bg: #231E18;
+    --sidebar: #1C1813;
+    --ink: #EDE0CE;
+    --muted: #A8937A;
+    --accent: #DBA35C;
+    --accent-hover: #EAB470;
+    --badge: #2E261C;
+    --badge-ink: #E7C08A;
+    --danger: #E07B5D;
+    --line: #3A3229;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --hover-tint: rgba(219, 163, 92, 0.12);
+    --on-accent: #2A211A;
+  }
+}
+
+:root[data-theme='dark'][data-palette='sepia'] {
+  --bg: #231E18;
+  --sidebar: #1C1813;
+  --ink: #EDE0CE;
+  --muted: #A8937A;
+  --accent: #DBA35C;
+  --accent-hover: #EAB470;
+  --badge: #2E261C;
+  --badge-ink: #E7C08A;
+  --danger: #E07B5D;
+  --line: #3A3229;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --hover-tint: rgba(219, 163, 92, 0.12);
+  --on-accent: #2A211A;
+}
+
+/* Nocturne — dark-only charcoal (same in light and dark theme) */
+:root[data-palette='nocturne'] {
+  --bg: #141416;
+  --sidebar: #101012;
+  --ink: #E6E2D8;
+  --muted: #8E887C;
+  --accent: #E8B44C;
+  --accent-hover: #F2C46A;
+  --badge: #221F1A;
+  --badge-ink: #E8B44C;
+  --danger: #E06A50;
+  --line: #2A2A2D;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --hover-tint: rgba(232, 180, 76, 0.10);
+  --on-accent: #141416;
 }
 
 * { box-sizing: border-box; }
@@ -363,4 +494,7 @@ body.popup { width: 300px; }
 .popup-wrap .popup-head button:hover { background: var(--badge); }
 .popup-foot { display: flex; justify-content: space-between; align-items: center; }
 label.switch { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.popup-appearance { display: flex; gap: 10px; }
+.popup-appearance label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; min-width: 0; }
+.popup-appearance select { min-width: 0; padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 13px var(--sans); }
 #status { margin: 0; color: var(--muted); min-height: 1em; font-size: 12.5px; }
