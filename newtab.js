@@ -75,12 +75,20 @@ function sectionEl(c) {
 
   const del = el('button');
   del.textContent = 'Delete';
-  del.onclick = async () => {
+  del.onclick = () => {
     const cnt = itemsOf(c.id).length;
-    if (confirm(`Delete collection "${c.name}" and its ${cnt} tab${cnt === 1 ? '' : 's'}?`)) {
-      await deleteCollectionDeep(c.id);
-      refresh();
-    }
+    askBar({
+      msg: `Delete "${c.name}" and its ${cnt} tab${cnt === 1 ? '' : 's'}? This cannot be undone.`,
+      buttons: [
+        { label: 'Cancel' },
+        { label: 'Delete', cls: 'ask-danger' },
+      ],
+      onResult: async (yes) => {
+        if (!yes) return;
+        await deleteCollectionDeep(c.id);
+        refresh();
+      },
+    });
   };
 
   actions.append(openAll, archive, del);
@@ -196,41 +204,75 @@ function tabCardEl(item) {
 
 // --- Actions ---
 
+// One floating bottom bar asks; Esc/outside/Cancel answers null. Replaces
+// prompt()/confirm() everywhere — same component, no browser chrome dialogs.
+function askBar({ msg, input = false, inputDefault = '', buttons, onResult }) {
+  document.querySelector('.ask-bar')?.remove();
+  const bar = el('div', 'ask-bar');
+  const label = el('span', 'ask-msg');
+  label.textContent = msg;
+  bar.append(label);
+  let field = null;
+  if (input) {
+    field = document.createElement('input');
+    field.type = 'text';
+    field.className = 'ask-input';
+    field.value = inputDefault;
+    field.placeholder = 'Collection name';
+    bar.append(field);
+  }
+  const close = () => {
+    bar.remove();
+    document.removeEventListener('click', outside);
+    document.removeEventListener('keydown', onKey);
+  };
+  const submit = (result) => { close(); onResult(result); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); submit(null); }
+    else if (e.key === 'Enter' && field) { e.preventDefault(); submit(field.value.trim() || null); }
+  };
+  const outside = (e) => { if (!bar.contains(e.target)) submit(null); };
+  for (const b of buttons) {
+    const btn = el('button', b.cls);
+    btn.textContent = b.label;
+    btn.onclick = () => submit(field ? field.value.trim() || null : (b.value ?? null));
+    bar.append(btn);
+  }
+  document.body.append(bar);
+  document.addEventListener('click', outside);
+  document.addEventListener('keydown', onKey);
+  if (field) { field.focus(); field.select(); }
+}
+
 async function renameCollection(c) {
-  const name = prompt('Collection name', c.name);
-  if (!name || name === c.name) return;
-  c.name = name;
-  await putCollection(c);
-  refresh();
+  askBar({
+    msg: 'Rename collection',
+    input: true,
+    inputDefault: c.name,
+    buttons: [
+      { label: 'Cancel' },
+      { label: 'Rename', cls: 'ask-primary' },
+    ],
+    onResult: async (name) => {
+      if (!name || name === c.name) return;
+      c.name = name;
+      await putCollection(c);
+      refresh();
+    },
+  });
 }
 
 // Ask where "Open all" should land: current window vs its own window.
 function openTargetBar(name, n, onChoose) {
-  document.querySelector('.open-target')?.remove();
-  const bar = el('div', 'open-target');
-  const msg = el('span', 'open-target-msg');
-  msg.textContent = `Open ${n} tab${n === 1 ? '' : 's'} from "${name}"`;
-  const cancel = el('button');
-  cancel.textContent = 'Cancel';
-  const current = el('button');
-  current.textContent = 'Current window';
-  const fresh = el('button', 'open-target-new');
-  fresh.textContent = 'New window';
-  bar.append(msg, cancel, current, fresh);
-  document.body.append(bar);
-  fresh.focus();
-  const close = () => {
-    bar.remove();
-    document.removeEventListener('click', outsideDismiss);
-    document.removeEventListener('keydown', onEsc);
-  };
-  const outsideDismiss = (e) => { if (!bar.contains(e.target)) close(); };
-  const onEsc = (e) => { if (e.key === 'Escape') close(); };
-  document.addEventListener('click', outsideDismiss);
-  document.addEventListener('keydown', onEsc);
-  current.onclick = () => { close(); onChoose('current'); };
-  fresh.onclick = () => { close(); onChoose('window'); };
-  cancel.onclick = close;
+  askBar({
+    msg: `Open ${n} tab${n === 1 ? '' : 's'} from "${name}"`,
+    buttons: [
+      { label: 'Cancel' },
+      { label: 'Current window', value: 'current' },
+      { label: 'New window', cls: 'ask-primary', value: 'window' },
+    ],
+    onResult: (choice) => { if (choice) onChoose(choice); },
+  });
 }
 
 async function openCollection(c, target) {
@@ -388,11 +430,20 @@ document.addEventListener('keydown', (e) => {
 
 // --- Topbar buttons ---
 
-$('#btn-new').onclick = async () => {
-  const name = prompt('Collection name');
-  if (!name) return;
-  await makeCollection(name);
-  refresh();
+$('#btn-new').onclick = () => {
+  askBar({
+    msg: 'New collection',
+    input: true,
+    buttons: [
+      { label: 'Cancel' },
+      { label: 'Create', cls: 'ask-primary' },
+    ],
+    onResult: async (name) => {
+      if (!name) return;
+      await makeCollection(name);
+      refresh();
+    },
+  });
 };
 
 $('#btn-export').onclick = async () => {
@@ -411,26 +462,39 @@ $('#file-import').onchange = async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
+  const fail = (msg) => askBar({ msg, buttons: [{ label: 'Close' }] });
   try {
     if (file.name.toLowerCase().endsWith('.json')) {
-      if (!confirm('Import replaces ALL saved data with the file contents. Continue?')) return;
-      await importAll(JSON.parse(await file.text()));
+      askBar({
+        msg: 'Import replaces ALL saved data with the file contents. Continue?',
+        buttons: [
+          { label: 'Cancel' },
+          { label: 'Import', cls: 'ask-danger' },
+        ],
+        onResult: async (yes) => {
+          if (!yes) return;
+          try {
+            await importAll(JSON.parse(await file.text()));
+            refresh();
+          } catch (err) { fail('Import failed: ' + err.message); }
+        },
+      });
     } else {
       // Bookmarks HTML (Netscape/Chrome export). Links only, flattened.
       const doc = new DOMParser().parseFromString(await file.text(), 'text/html');
       const links = [...doc.querySelectorAll('a')].filter((a) => /^https?:/.test(a.href));
       if (!links.length) {
-        alert('No bookmarks found in this file.');
+        fail('No bookmarks found in this file.');
         return;
       }
       const c = await makeCollection('Imported bookmarks ' + new Date().toLocaleDateString());
       for (const a of links) {
         await makeItem(c.id, { title: a.textContent.trim() || a.href, url: a.href });
       }
+      refresh();
     }
-    refresh();
   } catch (err) {
-    alert('Import failed: ' + err.message);
+    fail('Import failed: ' + err.message);
   }
 };
 
@@ -474,11 +538,48 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.palette) document.documentElement.dataset.palette = normalizePalette(changes.palette.newValue);
 });
 
+// --- New tab behavior ---
+// Override stays in the manifest (static in MV3, no runtime toggle exists).
+// Opt-in lives at page level: every new tab lands here first, and unless
+// `newtabDefault` is on (or the load carries ?direct=1), the tab is handed to
+// Chrome's real default NTP (chrome://new-tab-page) immediately. A sessionStorage
+// guard breaks the loop if Chrome bounces chrome://new-tab-page back at us.
+// ponytail: one redirect flash per new tab while opted out; swap to a
+// declarative approach if Chrome ever ships a runtime chrome_url_overrides API.
+
+function quietPage() {
+  // Bounce-back fallback: never loop, never pretend to be the real NTP.
+  const box = el('div', 'quiet');
+  const h = el('h1');
+  h.textContent = 'TabNest';
+  const p = el('p');
+  p.textContent = 'Alt+Shift+T (or the toolbar popup) opens your dashboard.';
+  const b = el('button');
+  b.textContent = 'Open dashboard';
+  b.onclick = () => { location.href = chrome.runtime.getURL('newtab.html?direct=1'); };
+  box.append(h, p, b);
+  document.body.textContent = '';
+  document.body.append(box);
+}
+
+async function newtabGate() {
+  if (new URLSearchParams(location.search).has('direct')) return;
+  const { newtabDefault } = await chrome.storage.local.get('newtabDefault');
+  if (newtabDefault) return; // opted in: dashboard IS the new tab
+  if (sessionStorage.getItem('tabnest-ntp-guard')) {
+    quietPage();
+    return;
+  }
+  sessionStorage.setItem('tabnest-ntp-guard', '1');
+  chrome.runtime.sendMessage({ type: 'goto-default-ntp' });
+}
+
 // --- Init ---
 
 window.addEventListener('focus', refresh);
 
 (async function init() {
+  await newtabGate();
   const { showArchived, theme, palette } = await chrome.storage.local.get(['showArchived', 'theme', 'palette']);
   state.showArchived = !!showArchived;
   applyTheme(theme);
@@ -486,9 +587,3 @@ window.addEventListener('focus', refresh);
   updateNav();
   await refresh();
 })();
-
-// Not your new tab page by default (chrome_url_overrides is removed from the
-// manifest; MV3 cannot flip it at runtime). Open this dashboard via the popup's
-// "Open dashboard", the Alt+Shift+T command, or chrome://extensions "Details".
-// ponytail: opt-in via manifest edit; a runtime switch needs the MV3
-// chrome_url_overrides API that does not exist yet.

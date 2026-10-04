@@ -2,29 +2,32 @@
    independent of it. Available choices live in js-Themes(). Default = classic pink.
    Selected id + dark/light render as: <html data-theme data-palette>. */
 :root {
+  --card: #F7F8FA;
   --sans: -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 :root[data-palette='classic'] {
+  --card: #F7F8FA;
   --bg: #FFFFFF;
   --sidebar: #F8F9FA;
   --ink: #2C3E50;
   --muted: #7F8C8D;
-  --accent: #FF6B9D;
-  --accent-hover: #F0568F;
-  --badge: #FFE5EC;
-  --badge-ink: #C2185B;
+  --accent: #C9708C;
+  --accent-hover: #B65F7B;
+  --badge: #F6E7ED;
+  --badge-ink: #A04E68;
   --danger: #E74C3C;
   --line: #ECEFF1;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.08);
-  --hover-tint: rgba(255, 107, 157, 0.08);
+  --hover-tint: rgba(201, 112, 140, 0.10);
   --on-accent: #FFFFFF;
 }
 
 /* Dark: forest-night green */
 @media (prefers-color-scheme: dark) {
   :root[data-palette='classic'] {
+  --card: #F7F8FA;
     --bg: #131A16;
     --sidebar: #101613;
     --ink: #E8EFE9;
@@ -346,19 +349,18 @@ input[type="checkbox"] { accent-color: var(--accent); }
   flex-direction: column;
   gap: 6px;
   padding: 14px 12px;
-  background: var(--bg);
-  border: 1px solid var(--line);
+  background: var(--card);
+  border: none;
   border-radius: 12px;
-  box-shadow: var(--shadow-card);
   color: var(--ink);
   text-decoration: none;
 }
-.tab-card:hover { border-color: var(--accent); }
+.tab-card:hover { background: var(--badge); }
 .tab-ico {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: var(--sidebar);
+  background: var(--bg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -426,8 +428,8 @@ input[type="checkbox"] { accent-color: var(--accent); }
 /* Empty state — invitation, not mood */
 #empty { max-width: 420px; margin: 0 auto; padding: 90px 20px 40px; text-align: center; color: var(--muted); }
 
-/* "Open all" target chooser — replaces the old silent new-window behavior */
-.open-target {
+/* Floating ask bar — new window/current, rename, create, delete confirm */
+.ask-bar {
   position: fixed;
   bottom: 28px;
   left: 50%;
@@ -442,8 +444,19 @@ input[type="checkbox"] { accent-color: var(--accent); }
   box-shadow: var(--shadow-float);
   z-index: 20;
 }
-.open-target-msg { font-size: 13.5px; }
-.open-target button {
+.ask-msg { font-size: 13.5px; }
+.ask-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--badge);
+  color: var(--ink);
+  font: 13.5px var(--sans);
+}
+.ask-input:focus { outline: 2px solid var(--accent); }
+.ask-bar button {
   padding: 7px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -452,9 +465,33 @@ input[type="checkbox"] { accent-color: var(--accent); }
   font: 600 13px var(--sans);
   cursor: pointer;
 }
-.open-target button:hover { border-color: var(--accent); color: var(--accent); }
-.open-target button.open-target-new { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.open-target button.open-target-new:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+.ask-bar button:hover { border-color: var(--accent); color: var(--accent); }
+.ask-bar button.ask-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ask-bar button.ask-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+.ask-bar button.ask-danger { background: var(--danger); border-color: var(--danger); color: var(--on-accent); }
+.ask-bar button.ask-danger:hover { filter: brightness(0.94); color: var(--on-accent); }
+
+/* Quiet page — only when Chrome bounces back a defaulted new tab */
+.quiet {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.quiet h1 { font-size: 22px; margin: 0; }
+.quiet p { color: var(--muted); margin: 0; }
+.quiet button {
+  margin-top: 8px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 600 13.5px var(--sans);
+  cursor: pointer;
+}
 
 #empty > p:first-child { font-size: 18px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
 #empty .sub { margin: 0 0 22px; }
