@@ -20,7 +20,9 @@ function itemsOf(id) {
 }
 
 async function refresh() {
-  state.collections = await listCollections(true);
+  state.collections = state.showArchived
+    ? await listCollections('only')
+    : await listCollections(false);
   state.items = await listItems();
   render();
 }
@@ -29,9 +31,8 @@ async function refresh() {
 
 function render() {
   grid.textContent = '';
-  const cols = state.collections
-    .filter((c) => (state.showArchived ? true : !c.archivedAt))
-    .sort((a, b) => a.position - b.position);
+  // View already decides the set (Dashboard: non-archived; Archived: archived only).
+  const cols = state.collections.sort((a, b) => a.position - b.position);
   $('#empty').hidden = cols.length > 0;
   for (const c of cols) grid.append(sectionEl(c));
   renderResults($('#search').value.trim());
