@@ -27,7 +27,7 @@
 /* Dark: forest-night green */
 @media (prefers-color-scheme: dark) {
   :root[data-palette='classic'] {
-  --card: #F7F8FA;
+    --card: #1B2620;
     --bg: #131A16;
     --sidebar: #101613;
     --ink: #E8EFE9;
@@ -46,6 +46,7 @@
 }
 
 :root[data-theme='dark'][data-palette='classic'] {
+  --card: #1B2620;
   --bg: #131A16;
   --sidebar: #101613;
   --ink: #E8EFE9;
@@ -64,6 +65,7 @@
 
 /* Ocean — calm blue */
 :root[data-palette='ocean'] {
+  --card: #F4F7FA;
   --bg: #FFFFFF;
   --sidebar: #F4F7FA;
   --ink: #23395B;
@@ -82,6 +84,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root[data-palette='ocean'] {
+    --card: #182632;
     --bg: #0F1721;
     --sidebar: #0C1219;
     --ink: #DFE9F3;
@@ -100,6 +103,7 @@
 }
 
 :root[data-theme='dark'][data-palette='ocean'] {
+  --card: #182632;
   --bg: #0F1721;
   --sidebar: #0C1219;
   --ink: #DFE9F3;
@@ -118,6 +122,7 @@
 
 /* Sepia — warm paper, readable ink */
 :root[data-palette='sepia'] {
+  --card: #F9F1E3;
   --bg: #FFF8EF;
   --sidebar: #F6EEE1;
   --ink: #4A3B2A;
@@ -136,6 +141,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root[data-palette='sepia'] {
+    --card: #2A241C;
     --bg: #231E18;
     --sidebar: #1C1813;
     --ink: #EDE0CE;
@@ -154,6 +160,7 @@
 }
 
 :root[data-theme='dark'][data-palette='sepia'] {
+  --card: #2A241C;
   --bg: #231E18;
   --sidebar: #1C1813;
   --ink: #EDE0CE;
@@ -172,6 +179,7 @@
 
 /* Nocturne — dark-only charcoal (same in light and dark theme) */
 :root[data-palette='nocturne'] {
+  --card: #1C1C1F;
   --bg: #141416;
   --sidebar: #101012;
   --ink: #E6E2D8;
@@ -510,6 +518,17 @@ body.popup { width: 300px; }
   color: var(--ink);
   font: 13.5px var(--sans);
 }
+#new-collection-name {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 13.5px var(--sans);
+}
+#new-collection-name:focus { outline: none; border-color: var(--accent); }
+#new-collection-name::placeholder { color: var(--muted); }
 .popup-wrap button {
   padding: 9px;
   border: none;

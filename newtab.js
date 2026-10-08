@@ -509,7 +509,7 @@ async function setArchivedView(on) {
   state.showArchived = on;
   await chrome.storage.local.set({ showArchived: on });
   updateNav();
-  render();
+  await refresh(); // re-fetch: archived view needs the archived set, not the dashboard's stale one
 }
 
 $('#nav-all').onclick = () => setArchivedView(false);
