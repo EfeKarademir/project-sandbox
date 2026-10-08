@@ -11,7 +11,7 @@ function el(tag, cls) {
 }
 
 const hostOf = (url) => { try { return new URL(url).hostname; } catch (_) { return ''; } };
-const faviconUrl = (url) => 'chrome://favicon2/?size=32&scale_factor=1x&page_url=' + encodeURIComponent(url);
+const faviconUrl = (url) => chrome.runtime.getURL('/_favicon/?pageUrl=' + encodeURIComponent(url) + '&size=32');
 
 // --- Data access ---
 
@@ -20,7 +20,9 @@ function itemsOf(id) {
 }
 
 async function refresh() {
-  state.collections = await listCollections(true);
+  state.collections = state.showArchived
+    ? await listCollections('only')
+    : await listCollections(false);
   state.items = await listItems();
   render();
 }
@@ -29,9 +31,8 @@ async function refresh() {
 
 function render() {
   grid.textContent = '';
-  const cols = state.collections
-    .filter((c) => (state.showArchived ? true : !c.archivedAt))
-    .sort((a, b) => a.position - b.position);
+  // View already decides the set (Dashboard: non-archived; Archived: archived only).
+  const cols = state.collections.sort((a, b) => a.position - b.position);
   $('#empty').hidden = cols.length > 0;
   for (const c of cols) grid.append(sectionEl(c));
   renderResults($('#search').value.trim());
@@ -57,8 +58,12 @@ function sectionEl(c) {
   const actions = el('div', 'actions');
   const openAll = el('button');
   openAll.textContent = 'Open all';
-  openAll.title = 'Open every tab in a new window';
-  openAll.onclick = () => openCollection(c);
+  openAll.title = 'Open every tab — pick new window or current window';
+  openAll.onclick = () => {
+    const items = itemsOf(c.id);
+    if (!items.length) return;
+    openTargetBar(c.name, items.length, (choice) => openCollection(c, choice));
+  };
 
   const archive = el('button');
   archive.textContent = c.archivedAt ? 'Unarchive' : 'Archive';
@@ -70,12 +75,20 @@ function sectionEl(c) {
 
   const del = el('button');
   del.textContent = 'Delete';
-  del.onclick = async () => {
+  del.onclick = () => {
     const cnt = itemsOf(c.id).length;
-    if (confirm(`Delete collection "${c.name}" and its ${cnt} tab${cnt === 1 ? '' : 's'}?`)) {
-      await deleteCollectionDeep(c.id);
-      refresh();
-    }
+    askBar({
+      msg: `Delete "${c.name}" and its ${cnt} tab${cnt === 1 ? '' : 's'}? This cannot be undone.`,
+      buttons: [
+        { label: 'Cancel' },
+        { label: 'Delete', cls: 'ask-danger' },
+      ],
+      onResult: async (yes) => {
+        if (!yes) return;
+        await deleteCollectionDeep(c.id);
+        refresh();
+      },
+    });
   };
 
   actions.append(openAll, archive, del);
@@ -191,18 +204,85 @@ function tabCardEl(item) {
 
 // --- Actions ---
 
-async function renameCollection(c) {
-  const name = prompt('Collection name', c.name);
-  if (!name || name === c.name) return;
-  c.name = name;
-  await putCollection(c);
-  refresh();
+// One floating bottom bar asks; Esc/outside/Cancel answers null. Replaces
+// prompt()/confirm() everywhere — same component, no browser chrome dialogs.
+function askBar({ msg, input = false, inputDefault = '', buttons, onResult }) {
+  document.querySelector('.ask-bar')?.remove();
+  const bar = el('div', 'ask-bar');
+  const label = el('span', 'ask-msg');
+  label.textContent = msg;
+  bar.append(label);
+  let field = null;
+  if (input) {
+    field = document.createElement('input');
+    field.type = 'text';
+    field.className = 'ask-input';
+    field.value = inputDefault;
+    field.placeholder = 'Collection name';
+    bar.append(field);
+  }
+  const close = () => {
+    bar.remove();
+    document.removeEventListener('click', outside);
+    document.removeEventListener('keydown', onKey);
+  };
+  const submit = (result) => { close(); onResult(result); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); submit(null); }
+    else if (e.key === 'Enter' && field) { e.preventDefault(); submit(field.value.trim() || null); }
+  };
+  const outside = (e) => { if (!bar.contains(e.target)) submit(null); };
+  for (const b of buttons) {
+    const btn = el('button', b.cls);
+    btn.textContent = b.label;
+    btn.onclick = () => submit(field ? field.value.trim() || null : (b.value ?? null));
+    bar.append(btn);
+  }
+  document.body.append(bar);
+  document.addEventListener('click', outside);
+  document.addEventListener('keydown', onKey);
+  if (field) { field.focus(); field.select(); }
 }
 
-async function openCollection(c) {
+async function renameCollection(c) {
+  askBar({
+    msg: 'Rename collection',
+    input: true,
+    inputDefault: c.name,
+    buttons: [
+      { label: 'Cancel' },
+      { label: 'Rename', cls: 'ask-primary' },
+    ],
+    onResult: async (name) => {
+      if (!name || name === c.name) return;
+      c.name = name;
+      await putCollection(c);
+      refresh();
+    },
+  });
+}
+
+// Ask where "Open all" should land: current window vs its own window.
+function openTargetBar(name, n, onChoose) {
+  askBar({
+    msg: `Open ${n} tab${n === 1 ? '' : 's'} from "${name}"`,
+    buttons: [
+      { label: 'Cancel' },
+      { label: 'Current window', value: 'current' },
+      { label: 'New window', cls: 'ask-primary', value: 'window' },
+    ],
+    onResult: (choice) => { if (choice) onChoose(choice); },
+  });
+}
+
+async function openCollection(c, target) {
   const items = itemsOf(c.id);
   if (!items.length) return;
-  await chrome.windows.create({ url: items.map((i) => i.url) });
+  if (target === 'window') {
+    await chrome.windows.create({ url: items.map((i) => i.url) });
+  } else {
+    for (const i of items) await chrome.tabs.create({ url: i.url });
+  }
   const now = Date.now();
   for (const i of items) await putItem({ ...i, lastOpenedAt: now });
 }
@@ -350,11 +430,20 @@ document.addEventListener('keydown', (e) => {
 
 // --- Topbar buttons ---
 
-$('#btn-new').onclick = async () => {
-  const name = prompt('Collection name');
-  if (!name) return;
-  await makeCollection(name);
-  refresh();
+$('#btn-new').onclick = () => {
+  askBar({
+    msg: 'New collection',
+    input: true,
+    buttons: [
+      { label: 'Cancel' },
+      { label: 'Create', cls: 'ask-primary' },
+    ],
+    onResult: async (name) => {
+      if (!name) return;
+      await makeCollection(name);
+      refresh();
+    },
+  });
 };
 
 $('#btn-export').onclick = async () => {
@@ -373,26 +462,39 @@ $('#file-import').onchange = async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
+  const fail = (msg) => askBar({ msg, buttons: [{ label: 'Close' }] });
   try {
     if (file.name.toLowerCase().endsWith('.json')) {
-      if (!confirm('Import replaces ALL saved data with the file contents. Continue?')) return;
-      await importAll(JSON.parse(await file.text()));
+      askBar({
+        msg: 'Import replaces ALL saved data with the file contents. Continue?',
+        buttons: [
+          { label: 'Cancel' },
+          { label: 'Import', cls: 'ask-danger' },
+        ],
+        onResult: async (yes) => {
+          if (!yes) return;
+          try {
+            await importAll(JSON.parse(await file.text()));
+            refresh();
+          } catch (err) { fail('Import failed: ' + err.message); }
+        },
+      });
     } else {
       // Bookmarks HTML (Netscape/Chrome export). Links only, flattened.
       const doc = new DOMParser().parseFromString(await file.text(), 'text/html');
       const links = [...doc.querySelectorAll('a')].filter((a) => /^https?:/.test(a.href));
       if (!links.length) {
-        alert('No bookmarks found in this file.');
+        fail('No bookmarks found in this file.');
         return;
       }
       const c = await makeCollection('Imported bookmarks ' + new Date().toLocaleDateString());
       for (const a of links) {
         await makeItem(c.id, { title: a.textContent.trim() || a.href, url: a.href });
       }
+      refresh();
     }
-    refresh();
   } catch (err) {
-    alert('Import failed: ' + err.message);
+    fail('Import failed: ' + err.message);
   }
 };
 
@@ -413,26 +515,75 @@ async function setArchivedView(on) {
 $('#nav-all').onclick = () => setArchivedView(false);
 $('#nav-archived').onclick = () => setArchivedView(true);
 
-// --- Theme ---
+// --- Theme & palette ---
+// Palette pick is independent of theme (dark/light). `nocturne` ignores theme
+// (same look either way); the others re-tint per theme.
+
+const PALETTES = ['classic', 'ocean', 'sepia', 'nocturne'];
+const normalizePalette = (p) => (PALETTES.includes(p) ? p : 'classic');
+
+function systemDark() {
+  return matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
 function applyTheme(stored) {
-  const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = stored === 'dark' || ((stored === undefined || stored === 'system') && systemDark());
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 
-// The popup's Dark mode switch writes `theme`; apply it live to any open dashboard.
+// The popup's Theme/Palette selectors write `theme`/`palette`; apply live.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.theme) applyTheme(changes.theme.newValue);
+  if (area !== 'local') return;
+  if (changes.theme) applyTheme(changes.theme.newValue);
+  if (changes.palette) document.documentElement.dataset.palette = normalizePalette(changes.palette.newValue);
 });
+
+// --- New tab behavior ---
+// Override stays in the manifest (static in MV3, no runtime toggle exists).
+// Opt-in lives at page level: every new tab lands here first, and unless
+// `newtabDefault` is on (or the load carries ?direct=1), the tab is handed to
+// Chrome's real default NTP (chrome://new-tab-page) immediately. A sessionStorage
+// guard breaks the loop if Chrome bounces chrome://new-tab-page back at us.
+// ponytail: one redirect flash per new tab while opted out; swap to a
+// declarative approach if Chrome ever ships a runtime chrome_url_overrides API.
+
+function quietPage() {
+  // Bounce-back fallback: never loop, never pretend to be the real NTP.
+  const box = el('div', 'quiet');
+  const h = el('h1');
+  h.textContent = 'TabNest';
+  const p = el('p');
+  p.textContent = 'Alt+Shift+T (or the toolbar popup) opens your dashboard.';
+  const b = el('button');
+  b.textContent = 'Open dashboard';
+  b.onclick = () => { location.href = chrome.runtime.getURL('newtab.html?direct=1'); };
+  box.append(h, p, b);
+  document.body.textContent = '';
+  document.body.append(box);
+}
+
+async function newtabGate() {
+  if (new URLSearchParams(location.search).has('direct')) return;
+  const { newtabDefault } = await chrome.storage.local.get('newtabDefault');
+  if (newtabDefault) return; // opted in: dashboard IS the new tab
+  if (sessionStorage.getItem('tabnest-ntp-guard')) {
+    quietPage();
+    return;
+  }
+  sessionStorage.setItem('tabnest-ntp-guard', '1');
+  chrome.runtime.sendMessage({ type: 'goto-default-ntp' });
+}
 
 // --- Init ---
 
 window.addEventListener('focus', refresh);
 
 (async function init() {
-  const { showArchived, theme } = await chrome.storage.local.get(['showArchived', 'theme']);
+  await newtabGate();
+  const { showArchived, theme, palette } = await chrome.storage.local.get(['showArchived', 'theme', 'palette']);
   state.showArchived = !!showArchived;
   applyTheme(theme);
+  document.documentElement.dataset.palette = normalizePalette(palette);
   updateNav();
   await refresh();
 })();

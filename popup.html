@@ -11,11 +11,31 @@
       <h2>Save to TabNest</h2>
       <button id="open-dashboard" title="Open the TabNest dashboard">Open dashboard</button>
     </div>
+    <div id="new-collection-row" hidden>
+      <input id="new-collection-name" type="text" placeholder="Name your first collection" autocomplete="off" spellcheck="false">
+    </div>
     <select id="collection" aria-label="Collection"></select>
     <button id="save-tab">Save this tab</button>
     <button id="save-window">Save all tabs in window</button>
+    <label class="switch"><input type="checkbox" id="newtab-default"><span>Open TabNest on new tab</span></label>
+    <div class="popup-appearance">
+      <label>Theme
+        <select id="picker-theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <label>Palette
+        <select id="picker-palette">
+          <option value="classic">Classic</option>
+          <option value="ocean">Ocean</option>
+          <option value="sepia">Sepia</option>
+          <option value="nocturne">Nocturne</option>
+        </select>
+      </label>
+    </div>
     <div class="popup-foot">
-      <label class="switch"><input type="checkbox" id="dark-mode"><span>Dark mode</span></label>
       <p id="status" aria-live="polite"></p>
     </div>
   </div>

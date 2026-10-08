@@ -19,8 +19,11 @@ async function refreshMenus() {
 chrome.runtime.onInstalled.addListener(refreshMenus);
 chrome.runtime.onStartup.addListener(refreshMenus);
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg && msg.type === 'collections-changed') refreshMenus();
+  if (msg && msg.type === 'goto-default-ntp' && sender.tab) {
+    chrome.tabs.update(sender.tab.id, { url: 'chrome://new-tab-page/' });
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -42,7 +45,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.commands.onCommand.addListener(async (cmd) => {
   if (cmd === 'open-dashboard') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html?direct=1') });
   }
   if (cmd === 'save-all-tabs') {
     await saveAllTabsInWindow();
